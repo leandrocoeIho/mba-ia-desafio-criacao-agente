@@ -63,19 +63,27 @@ de leitura (Garantia 4) isolados por agente.
 
 ## Armazenamento
 
-Um único Postgres (subido via `docker-compose.yml`, serviço `db`), com dois
-papéis:
+Regra de divisão: **se pode mudar durante a conversa, vai pro Postgres; se
+nunca muda, fica em memória.** Um único Postgres (subido via
+`docker-compose.yml`, serviço `db`) cobre os dois papéis que precisam de
+disco:
 
 1. **Backing do ADK**: `DatabaseSessionService(db_url="postgresql+asyncpg://...")`
    — schema próprio do ADK para sessões, state e eventos (inclui as
    confirmações pendentes, por construção).
-2. **Tabelas de negócio** (schema nosso, migradas/seedadas a partir dos
-   `dados/*.json`, que permanecem intocados):
-   - `areas` — espelha `areas.json` (id, nome, taxa).
+2. **Tabelas de negócio mutáveis** (schema nosso, seedadas a partir de
+   `dados/reservas.json` e `dados/visitantes.json`, que permanecem
+   intocados):
    - `reservas` — `codigo` (PK), `apartamento`, `area`, `data`, `status`
      (`ativa`/`cancelada`). Cancelamento é soft-delete (nunca apaga a linha),
      então um código nunca é reaproveitado, nem o de uma reserva cancelada.
    - `visitantes` — `apartamento`, `nome`, `data`.
+
+   Essas duas tabelas vivem em **disco** (Postgres), não em memória do
+   processo — é o que garante a Garantia 3: todo `INSERT`/`UPDATE` feito
+   durante uma conversa é commitado no banco antes da tool responder, e um
+   reinício da API não apaga nada porque nada dessa escrita passou por uma
+   variável Python entre uma chamada e outra.
 
    Como o cancelamento nunca apaga a linha, o próprio `codigo` como chave
    primária já garante que um código novo (gerado como `RSV-` + sufixo
@@ -88,6 +96,36 @@ papéis:
    `reservar_area` tenta o insert dentro de uma transação; se vier violação de
    unicidade, captura o erro e devolve uma resposta normal de "data já
    ocupada" (nunca propaga como 500).
+
+3. **Dados de referência, só em memória, sem tabela**: `dados/areas.json` e
+   `dados/apartamentos.json` nunca são escritos por nenhuma regra de
+   negócio — só existem pra o modelo saber o que precisa (nome da área, taxa,
+   morador do apartamento) sem alucinar. Carregados num dicionário Python no
+   startup do processo e consultados direto pelas tools; não há tabela,
+   constraint ou preocupação de concorrência porque não há escrita.
+
+### Camada de escrita: código compartilhado, não um agente
+
+Todo `INSERT`/`UPDATE` em `reservas`/`visitantes` passa por um módulo de
+acesso a dados único (`repository`/`data_access`), usado por todas as tools
+de escrita — não por um agente de IA intermediário. A permissão pra escrever
+nunca é uma decisão de um agente (nem do especialista, nem de um orquestrador
+hipotético): é código. Três mecanismos, todos fora do alcance de qualquer
+prompt, decidem o que pode ser gravado:
+
+1. O `apartamento` usado em toda escrita vem de `tool_context.state`, nunca
+   de um argumento que o modelo escolhe (Garantia 2).
+2. Escrita que gera cobrança ou libera acesso fica mecanicamente bloqueada
+   pelo `require_confirmation` do ADK até a rota `/confirmacoes` — nenhum
+   agente consegue "aprovar" isso sozinho, só o backend fora da conversa
+   (Garantia 1).
+3. A exclusividade de `(area, data)` é imposta pela constraint do Postgres,
+   não por uma checagem de agente antes de salvar (Garantia 5).
+
+Um agente orquestrador adicional decidindo se uma escrita "pode" ou não
+reintroduziria exatamente o risco que o desafio pede pra eliminar: a decisão
+voltaria a depender de um modelo de linguagem, vulnerável a prompt injection
+e alucinação, só que numa camada que pareceria mais segura sem ser.
 
 ## Garantia 1 — cobrança/acesso só com confirmação
 
