@@ -171,6 +171,42 @@ Coberta na arquitetura de agentes: retrieval por capítulo dentro da tool
 instrução do `root_agent` (só a `description` do especialista menciona o
 tema, pra guiar a transferência).
 
+### Validação por teste descartável (não faz parte da entrega)
+
+Testamos a abordagem de retrieval por capítulo (sem embeddings — ver
+discussão abaixo) com um script solto chamando a API do Gemini direto,
+passando pro modelo só os 14 títulos de capítulo pra escolher, e depois só o
+conteúdo do capítulo escolhido pra responder. Com 4 perguntas de teste, o
+modelo:
+
+- Escolheu o capítulo certo nas 4 vezes, só com os títulos (sem conteúdo).
+- Respondeu de forma correta e completa em 3 dos 4 casos.
+- Num caso (horário da piscina aos domingos), respondeu só a parte final do
+  artigo (fechamento às 20h), **omitindo o horário de abertura** (9h) e a
+  menção a feriados — resposta tecnicamente correta pra pergunta literal, mas
+  incompleta como atendimento.
+- Noutro caso (vagas de garagem), respondeu de forma genérica porque **o
+  próprio regulamento remete a outro documento** ("definido na Convenção")
+  que não está em `dados/`. O modelo não inventou um número — foi honesto
+  sobre o limite da informação disponível. Isso não é falha de retrieval, é
+  um limite real da fonte de dados.
+
+Conclusão pra implementação real: a instrução da tool `consultar_regulamento`
+deve pedir uma resposta **completa em relação ao artigo encontrado** (não só
+o trecho mínimo que bate com as palavras da pergunta), e deve instruir o
+modelo a **deixar explícito** quando o próprio regulamento remete a outro
+documento (ex.: "a Convenção"), em vez de devolver uma frase vaga como se
+fosse resposta completa.
+
+### Por que não usar embeddings/busca por similaridade
+
+Com só 14 capítulos (~500 linhas), deixar o próprio LLM escolher o capítulo a
+partir da lista de títulos já funciona com precisão (validado acima) e exige
+zero infraestrutura nova (sem `pgvector`, sem pipeline de embedding, sem
+chamada extra de API). Embeddings compensariam a complexidade só se o corpus
+fosse grande o suficiente pra a correspondência título↔pergunta ficar fraca —
+não é o caso aqui.
+
 ## Garantia 5 — dois moradores, uma reserva
 
 Coberta no armazenamento: índice UNIQUE parcial no Postgres garante
