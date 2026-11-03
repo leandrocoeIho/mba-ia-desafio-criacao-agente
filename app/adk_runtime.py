@@ -79,7 +79,9 @@ def montar_resposta_confirmacao(call_id: str, confirmado: bool) -> types.Content
 
 async def run_com_retry(runner, **kwargs) -> list[Event]:
     """Coleta todos os eventos de run_async, tentando de novo em caso de 503
-    transitorio do Gemini (observado no tier gratuito durante o design)."""
+    transitorio ou 429 (cota excedida) do Gemini — ambos observados no tier
+    gratuito durante o desenvolvimento. Um ClientError que nao seja 429 (ex.:
+    400/404) nao e retentavel e sobe na hora."""
     ultimo_erro: Exception | None = None
     for tentativa in range(5):
         try:
@@ -87,5 +89,10 @@ async def run_com_retry(runner, **kwargs) -> list[Event]:
         except genai_errors.ServerError as exc:
             ultimo_erro = exc
             await asyncio.sleep(5 * (tentativa + 1))
+        except genai_errors.ClientError as exc:
+            if exc.code != 429:
+                raise
+            ultimo_erro = exc
+            await asyncio.sleep(20 * (tentativa + 1))
     assert ultimo_erro is not None
     raise ultimo_erro
