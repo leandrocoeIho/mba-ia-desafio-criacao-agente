@@ -8,7 +8,9 @@ from app import reference_data, repository
 from app.db import get_session_factory
 
 
-def _requer_confirmacao_reserva(area: str, data: str) -> bool:
+def _requer_confirmacao_reserva(area: str, data: str, **_ignorado) -> bool:
+    # O ADK injeta tool_context nessa chamada porque reservar_area o declara;
+    # **_ignorado absorve isso (e qualquer outro extra futuro) sem quebrar.
     info = reference_data.carregar_areas().get(area)
     return bool(info and info.taxa > 0)
 
