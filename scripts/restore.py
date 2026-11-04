@@ -6,18 +6,13 @@ from pathlib import Path
 
 from sqlalchemy import text
 
-ROOT = Path(__file__).resolve().parent.parent
-sys.path.insert(0, str(ROOT))
-
-if sys.platform == "win32":
-    asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from app.adk_app import make_session_service
 from app.config import get_settings
 from app.db import Base, make_engine, make_session_factory
 from app.models import ReservaModel, VisitanteModel
-
-DADOS_DIR = ROOT / "dados"
+from app.reference_data import DADOS_DIR
 
 
 async def restaurar(database_url: str) -> None:
@@ -55,10 +50,7 @@ async def restaurar(database_url: str) -> None:
 
     await engine.dispose()
 
-    # Recria o schema próprio do ADK (sessões/eventos) num banco limpo.
-    # prepare_tables() e chamado automaticamente antes de qualquer operacao,
-    # mas so construir o service nao basta -- precisa chamar explicitamente
-    # pra criar o schema aqui, de acordo com a propria documentacao do metodo.
+    # Recria as tabelas do ADK (sessões/eventos), apagadas junto com o schema.
     adk_session_service = make_session_service()
     await adk_session_service.prepare_tables()
 

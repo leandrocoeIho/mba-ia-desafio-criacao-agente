@@ -1,6 +1,5 @@
 from google.adk.agents import LlmAgent
-from google.adk.apps._configs import ResumabilityConfig
-from google.adk.apps.app import App
+from google.adk.apps import App, ResumabilityConfig
 from google.adk.runners import Runner
 from google.adk.sessions import DatabaseSessionService
 

@@ -2,7 +2,13 @@ import inspect
 from datetime import date
 
 from app import db, repository
-from app.agents.reservas import build_especialista_reservas, cancelar_reserva, listar_reservas, reservar_area
+from app.agents.reservas import (
+    build_especialista_reservas,
+    cancelar_reserva,
+    listar_reservas,
+    reservar_area,
+    verificar_disponibilidade,
+)
 
 
 class _ToolContextFake:
@@ -60,7 +66,22 @@ async def test_listar_reservas_usa_apartamento_da_sessao(session_factory):
     assert resultado_outro["reservas"] == []
 
 
-def test_build_especialista_reservas_tem_as_tres_tools():
+async def test_verificar_disponibilidade_so_diz_livre_ou_ocupada(session_factory):
+    db.configurar_session_factory(session_factory)
+    await reservar_area(area="quadra", data="2030-04-06", tool_context=_ToolContextFake({"apartamento": "302"}))
+    ocupada = await verificar_disponibilidade(area="quadra", data="2030-04-06")
+    assert ocupada == {"area": "quadra", "data": "2030-04-06", "disponivel": False}
+    livre = await verificar_disponibilidade(area="quadra", data="2030-04-07")
+    assert livre["disponivel"] is True
+
+
+async def test_data_invalida_vira_erro_e_nao_excecao(session_factory):
+    db.configurar_session_factory(session_factory)
+    resultado = await reservar_area(area="quadra", data="2030-02-30", tool_context=_ToolContextFake({"apartamento": "101"}))
+    assert "erro" in resultado
+
+
+def test_build_especialista_reservas_tem_as_quatro_tools():
     agente = build_especialista_reservas()
     nomes = {tool.name for tool in agente.tools}
-    assert nomes == {"reservar_area", "cancelar_reserva", "listar_reservas"}
+    assert nomes == {"verificar_disponibilidade", "reservar_area", "cancelar_reserva", "listar_reservas"}

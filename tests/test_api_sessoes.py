@@ -1,11 +1,14 @@
+from datetime import date
+
 import httpx
 import pytest
 
 from app.main import app, lifespan
+from app.models import ReservaModel, VisitanteModel
 
 
 @pytest.fixture
-async def client():
+async def client(session_factory):  # pede session_factory só pela limpeza do banco no teardown
     async with lifespan(app):
         transport = httpx.ASGITransport(app=app)
         async with httpx.AsyncClient(transport=transport, base_url="http://test") as c:
@@ -19,6 +22,12 @@ async def test_criar_sessao(client):
 
 
 async def test_sessao_101_nao_ve_dados_do_302(client):
+    # Sem esses dados no banco o teste passaria sem provar nada.
+    async with app.state.session_factory() as s:
+        s.add(ReservaModel(codigo="RSV-4821", apartamento="302", area="salao-de-festas", data=date(2030, 3, 16)))
+        s.add(VisitanteModel(apartamento="302", nome="Marina Duarte", data=date(2030, 3, 16)))
+        await s.commit()
+
     s1 = (await client.post("/sessoes", json={"apartamento": "101"})).json()["session_id"]
     resp = await client.post(
         f"/sessoes/{s1}/mensagens",

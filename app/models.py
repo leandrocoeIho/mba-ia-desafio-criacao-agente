@@ -24,6 +24,8 @@ class ReservaModel(Base):
             postgresql_where=text("status = 'ativa'"),
         ),
     )
+
+
 class VisitanteModel(Base):
     __tablename__ = "visitantes"
 

@@ -1,6 +1,7 @@
 from datetime import date
 
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 
 from app.models import ReservaModel, VisitanteModel
 
@@ -25,9 +26,6 @@ async def test_criar_tabelas_e_inserir_reserva(session_factory):
         assert reserva.apartamento == "101"
         assert reserva.status == "ativa"
 
-
-
-from sqlalchemy.exc import IntegrityError
 
 async def test_duas_reservas_ativas_mesma_area_data_violam_unique(session_factory):
     async with session_factory() as session:

@@ -2,12 +2,16 @@ import re
 from dataclasses import dataclass
 from pathlib import Path
 
-REGULAMENTO_PATH = Path(__file__).resolve().parent.parent / "dados" /"regulamento.md"
+from app.reference_data import DADOS_DIR
+
+REGULAMENTO_PATH = DADOS_DIR / "regulamento.md"
+
 
 @dataclass(frozen=True)
 class Capitulo:
     titulo: str
     conteudo: str
+
 
 def carregar_capitulos(path: Path = REGULAMENTO_PATH) -> list[Capitulo]:
     texto = path.read_text(encoding="utf-8")

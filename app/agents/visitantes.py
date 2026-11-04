@@ -17,9 +17,13 @@ async def autorizar_visitante(nome: str, data: str, tool_context: ToolContext) -
         data: data da visita, no formato AAAA-MM-DD.
     """
     apartamento = tool_context.state["apartamento"]
+    try:
+        dia = date.fromisoformat(data)
+    except ValueError:
+        return {"erro": "data inválida, use AAAA-MM-DD"}
     session_factory = get_session_factory()
     async with session_factory() as session:
-        visitante = await repository.autorizar_visitante(session, apartamento, nome, date.fromisoformat(data))
+        visitante = await repository.autorizar_visitante(session, apartamento, nome, dia)
     return {"status": "autorizado", "nome": visitante.nome, "data": data}
 
 

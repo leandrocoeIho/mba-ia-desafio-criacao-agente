@@ -1,6 +1,10 @@
+import asyncio
+
 from google.adk.events.event import Event
+from google.genai import errors as genai_errors
 from google.genai import types
 
+from app import adk_runtime
 from app.adk_runtime import confirmacoes_pendentes, encontrar_confirmacao_pendente, montar_resposta_confirmacao
 
 
@@ -56,6 +60,26 @@ def test_encontrar_confirmacao_pendente_por_id():
     assert achada.acao == "autorizar_visitante"
 
     assert encontrar_confirmacao_pendente(eventos, "id-inexistente") is None
+
+
+async def test_retry_depois_de_progresso_retoma_a_invocacao_sem_reenviar_a_mensagem(monkeypatch):
+    # Reenviar a aprovação depois que a tool já rodou faria o ADK executá-la de novo.
+    sleep_real = asyncio.sleep
+    monkeypatch.setattr(adk_runtime.asyncio, "sleep", lambda _: sleep_real(0))
+    chamadas: list[dict] = []
+
+    class RunnerFake:
+        async def run_async(self, **kwargs):
+            chamadas.append(kwargs)
+            yield Event(invocation_id="inv-1", author="especialista_visitantes")
+            if len(chamadas) == 1:
+                raise genai_errors.ClientError(429, {"error": {"message": "quota"}})
+
+    eventos = await adk_runtime.run_com_retry(
+        RunnerFake(), user_id="u", session_id="s", invocation_id="inv-1", new_message="aprovacao"
+    )
+    assert len(eventos) == 2
+    assert chamadas[1] == {"user_id": "u", "session_id": "s", "invocation_id": "inv-1"}
 
 
 def test_id_ja_respondido_nao_e_encontrado_de_novo():

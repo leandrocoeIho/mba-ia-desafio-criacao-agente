@@ -7,7 +7,7 @@ from app.main import app, lifespan
 
 
 @pytest.fixture
-async def client():
+async def client(session_factory):  # pede session_factory só pela limpeza do banco no teardown
     async with lifespan(app):
         transport = httpx.ASGITransport(app=app)
         async with httpx.AsyncClient(transport=transport, base_url="http://test") as c:

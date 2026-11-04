@@ -1,5 +1,4 @@
-import random
-import string
+import uuid
 from dataclasses import dataclass
 from datetime import date
 
@@ -30,8 +29,8 @@ class AreaOcupadaError(Exception):
     """A área já tem uma reserva ativa na data pedida."""
 
 def _gerar_codigo() -> str:
-    sufixo = "".join(random.choices(string.digits, k=4))
-    return f"RSV-{sufixo}"
+    # 4 digitos aleatorios colidiam com os codigos do seed (RSV-1377...) e viravam 500 na PK.
+    return f"RSV-{uuid.uuid4().hex[:8].upper()}"
 
 
 async def criar_reserva(session: AsyncSession, apartamento: str, area: str, data: date) -> Reserva:
